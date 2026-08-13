@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const USERS = [{ n: "Lucio", p: "4321" }, { n: "Tio Joao", p: "1111" }, { n: "Ana", p: "2222" }];
+const USERS = [{ n: "Lucio", p: "4321" }, { n: "Marina", p: "2222" }, { n: "Maira", p: "2222" }, { n: "Pedro", p: "2222" },{ n: "Morenz", p: "2222" }];
 const LIMITE = new Date("2026-08-13T11:30:00-03:00");
 
 // 🎾 OS 32 CONFRONTOS REAIS DA 1ª RODADA
