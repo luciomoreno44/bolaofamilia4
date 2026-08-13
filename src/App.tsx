@@ -50,6 +50,8 @@ export default function App() {
   const [ranking, setRanking] = useState<{ nome: string; pontos: number }[]>([]);
   const [listaUsuarios, setListaUsuarios] = useState<{ n: string; p: string }[]>(USERS);
   const [textoImportar, setTextoImportar] = useState("");
+  const [usuarioSelecionado, setUsuarioSelecionado] = useState(null);
+  const [faseVisualizar, setFaseVisualizar] = useState(1);
   const bloqueado = new Date() > LIMITE;
 
   useEffect(() => { 
@@ -194,19 +196,107 @@ export default function App() {
     );
   }
 
-  return (
+    return (
     <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#f8fafc", padding: "24px 16px", color: "#1e293b", fontFamily: "sans-serif", display: "flex", flexDirection: "column", alignItems: "center", boxSizing: "border-box" }}>
       <div style={{ width: "100%", maxWidth: "360px" }}>
-        <header style={{ textAlign: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "16px", position: "relative" }}><button onClick={() => { setRCurr(1); setTela("login"); }} style={{ position: "absolute", left: 0, top: "4px", background: "none", border: "none", color: "#64748b", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}>← Sair</button><h1 style={{ fontSize: "20px", fontWeight: "bold", color: "#1d4ed8", margin: 0 }}>Ranking da Família</h1></header>
+        <header style={{ textAlign: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "16px", position: "relative" }}>
+          <button type="button" onClick={() => { setRCurr(1); setTela("login"); }} style={{ position: "absolute", left: 0, top: "4px", background: "none", border: "none", color: "#64748b", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}>← Sair</button>
+          <h1 style={{ fontSize: "20px", fontWeight: "bold", color: "#1d4ed8", margin: 0 }}>Ranking da Família</h1>
+          <p style={{ fontSize: "11px", color: "#64748b", margin: "4px 0 0 0" }}>Clique no nome para ver os palpites 👁️</p>
+        </header>
+        
         <main style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px" }}>
           {ranking.map((f, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ fontWeight: "bold", color: "#cbd5e1" }}>#{i + 1}</span><h3 style={{ fontWeight: "bold", fontSize: "14px", margin: 0 }}>{f.nome} {f.nome === user && "(Você)"}</h3></div>
+            <div 
+              key={i} 
+              onClick={() => setUsuarioSelecionado(f.nome)}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: "16px", cursor: "pointer" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontWeight: "bold", color: "#cbd5e1" }}>#{i + 1}</span>
+                <h3 style={{ fontWeight: "bold", fontSize: "14px", margin: 0 }}>{f.nome} {f.nome === user && "(Você)"}</h3>
+              </div>
               <div><span style={{ fontSize: "16px", fontWeight: "900", color: "#1d4ed8" }}>{f.pontos}</span> <span style={{ fontSize: "12px", color: "#94a3b8" }}>pts</span></div>
             </div>
           ))}
         </main>
       </div>
+
+      {/* 📋 JANELA FLUTUANTE PARA VER OS PALPITES DE OUTRO PARTICIPANTE */}
+      {usuarioSelecionado && (() => {
+        const palpitesParente = JSON.parse(localStorage.getItem(`b_96_${usuarioSelecionado}`) || "{}");
+        const configFase = CONFIG.find(c => c.id === faseVisualizar) || CONFIG[0];
+
+        return (
+          <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000, padding: "16px", boxSizing: "border-box" }}>
+            <div style={{ backgroundColor: "#ffffff", width: "100%", maxWidth: "360px", height: "80vh", borderRadius: "16px", padding: "20px", display: "flex", flexDirection: "column", boxSizing: "border-box" }}>
+              
+              <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "10px", marginBottom: "12px" }}>
+                <h2 style={{ fontSize: "14px", fontWeight: "bold", margin: 0, color: "#1e293b" }}>Palpites de: {usuarioSelecionado}</h2>
+                <button onClick={() => { setUsuarioSelecionado(null); setFaseVisualizar(1); }} style={{ border: "none", background: "#f1f5f9", borderRadius: "50%", width: "28px", height: "28px", fontWeight: "bold", cursor: "pointer", color: "#000" }}>X</button>
+              </header>
+
+              {/* Seletor de fases horizontal */}
+              <div style={{ display: "flex", gap: "4px", overflowX: "auto", paddingBottom: "8px", marginBottom: "12px" }}>
+                {CONFIG.map(c => (
+                  <button 
+                    key={c.id} 
+                    type="button"
+                    onClick={() => setFaseVisualizar(c.id)}
+                    style={{ padding: "6px 10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "11px", whiteSpace: "nowrap", cursor: "pointer", backgroundColor: faseVisualizar === c.id ? "#1d4ed8" : "#ffffff", color: faseVisualizar === c.id ? "#ffffff" : "#334155", fontWeight: faseVisualizar === c.id ? "bold" : "normal" }}
+                  >
+                    {c.nome}
+                  </button>
+                ))}
+              </div>
+
+              {/* Listagem dos palpites */}
+              <div style={{ flex: 1, overflowY: "auto", paddingRight: "4px" }}>
+                {Array.from({ length: configFase.total }).map((_, i) => {
+                  const chave = `${faseVisualizar}_j${i + 1}`;
+                  const palpite = palpitesParente[chave];
+                  const vReal = resultados[chave];
+                  
+                  const nA = getNome(faseVisualizar, i, "A", palpitesParente);
+                  const nB = getNome(faseVisualizar, i, "B", palpitesParente);
+
+                  return (
+                    <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid #f1f5f9", fontSize: "12px" }}>
+                      <p style={{ margin: "0 0 4px 0", fontSize: "9px", color: "#94a3b8", fontWeight: "bold" }}>JOGO #{i + 1}</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {[nA, nB].map((j, idx) => {
+                          const foiEscolhido = palpite === j;
+                          const ganhouNaVidaReal = vReal === j;
+                          
+                          let bg = "#f8fafc"; let txt = "#334155"; let peso = "normal";
+                          if (foiEscolhido) {
+                            peso = "bold";
+                            if (vReal) {
+                              bg = ganhouNaVidaReal ? "#dcfce7" : "#fee2e2";
+                              txt = ganhouNaVidaReal ? "#15803d" : "#b91c1c";
+                            } else {
+                              bg = "#dbeafe"; txt = "#1d4ed8";
+                            }
+                          }
+
+                          return (
+                            <div key={idx} style={{ backgroundColor: bg, color: txt, padding: "6px 8px", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: peso }}>
+                              <span>{j}</span>
+                              {foiEscolhido && <span>{vReal ? (ganhouNaVidaReal ? "✅" : "❌") : "🎯"}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
+
