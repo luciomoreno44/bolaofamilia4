@@ -34,7 +34,7 @@ const BYES_R2 = [
    "B. Shelton (8)", "I. Buse (29)",   "U. Humbert (24)", "L. Musetti (10)", "L. Tien (16)",
   "F. Tiafoe (17)", "A. Rinderknech (25)", "F. Auger-Aliassime (2)"
 ];
-
+ 
 const CONFIG = [
   { id: 1, nome: "1ª Rodada", pts: 10, total: 32 }, { id: 2, nome: "2ª Rodada (Byes)", pts: 20, total: 32 },
   { id: 3, nome: "3ª Rodada", pts: 30, total: 16 }, { id: 4, nome: "Oitavas de Final", pts: 40, total: 8 },
@@ -48,24 +48,62 @@ export default function App() {
   const [votos, setVotos] = useState<{ [key: string]: string }>({});
   const [resultados, setResultados] = useState<{ [key: string]: string }>({});
   const [ranking, setRanking] = useState<{ nome: string; pontos: number }[]>([]);
+  const [listaUsuarios, setListaUsuarios] = useState<{ n: string; p: string }[]>(USERS);
+  const [textoImportar, setTextoImportar] = useState("");
   const bloqueado = new Date() > LIMITE;
 
-  useEffect(() => { const res = localStorage.getItem("b_res"); if (res) setResultados(JSON.parse(res)); }, []);
+  useEffect(() => { 
+    const res = localStorage.getItem("b_res"); if (res) setResultados(JSON.parse(res)); 
+    const uSalvos = localStorage.getItem("b_usuarios_locais");
+    if (uSalvos) { setListaUsuarios([...USERS, ...JSON.parse(uSalvos)]); }
+  }, []);
+
   useEffect(() => { if (user && tela === "palpites") { const s = localStorage.getItem(`b_96_${user}`); if (s) setVotos(JSON.parse(s)); } }, [user, tela]);
+  
   useEffect(() => {
     if (tela === "ranking") {
-      const lista = USERS.map(u => {
+      const lista = listaUsuarios.map(u => {
         const p = JSON.parse(localStorage.getItem(`b_96_${u.n}`) || "{}"); let pts = 0;
         Object.keys(resultados).forEach(k => { if (p[k] === resultados[k]) { const f = CONFIG.find(c => c.id === parseInt(k.split("_"))); if (f) pts += f.pts; } });
         return { nome: u.n, pontos: pts };
       }); setRanking(lista.sort((a, b) => b.pontos - a.pontos));
     }
-  }, [tela, resultados]);
+  }, [tela, resultados, listaUsuarios]);
 
   const logar = (e: React.FormEvent) => {
-    e.preventDefault(); const u = USERS.find(x => x.n.toLowerCase() === inputN.trim().toLowerCase());
-    if (!u || u.p !== inputP.trim()) return alert("Dados incorretos!");
+    e.preventDefault(); const u = listaUsuarios.find(x => x.n.toLowerCase() === inputN.trim().toLowerCase());
+    if (!u || u.p !== inputP.trim()) return alert("Dados incorretos! Se você é novo, clique em Cadastrar.");
     setUser(u.n); setTela(bloqueado ? "ranking" : "palpites");
+  };
+
+  const cadastrarAparelho = () => {
+    const nomeCler = inputN.trim(); const pinCler = inputP.trim();
+    if (!nomeCler || pinCler.length < 4) return alert("Digite um Nome e um PIN de 4 dígitos!");
+    const jaExiste = listaUsuarios.find(x => x.n.toLowerCase() === nomeCler.toLowerCase());
+    if (jaExiste) return alert("Esse nome já está cadastrado!");
+    const novosLocais = JSON.parse(localStorage.getItem("b_usuarios_locais") || "[]");
+    novosLocais.push({ n: nomeCler, p: pinCler });
+    localStorage.setItem("b_usuarios_locais", JSON.stringify(novosLocais));
+    setListaUsuarios([...listaUsuarios, { n: nomeCler, p: pinCler }]);
+    setUser(nomeCler); alert("Cadastro realizado com sucesso! 🎉");
+    setTela(bloqueado ? "ranking" : "palpites");
+  };
+
+  const processarImportacao = () => {
+    try {
+      if (!textoImportar.includes("||")) return alert("Código inválido!");
+      const [nomePart, dadosVotos] = textoImportar.split("||");
+      const n = nomePart.replace("BOLAO:", "").trim();
+      const v = JSON.parse(dadosVotos.trim());
+      localStorage.setItem(`b_96_${n}`, JSON.stringify(v));
+      const novosLocais = JSON.parse(localStorage.getItem("b_usuarios_locais") || "[]");
+      if (!listaUsuarios.find(x => x.n.toLowerCase() === n.toLowerCase())) {
+        novosLocais.push({ n: n, p: "0000" });
+        localStorage.setItem("b_usuarios_locais", JSON.stringify(novosLocais));
+        setListaUsuarios([...listaUsuarios, { n: n, p: "0000" }]);
+      }
+      alert(`Palpites de ${n} importados com sucesso! 🎾`); setTextoImportar("");
+    } catch (e) { alert("Erro ao ler o código. Verifique se copiou inteiro."); }
   };
 
   const getNome = (fase: number, idx: number, pos: "A" | "B", dados: any): string => {
@@ -96,11 +134,14 @@ export default function App() {
     return (
       <div style={{ display: "flex", minHeight: "100vh", width: "100%", flexDirection: "column", alignItems: "center", justifyContent: "center", backgroundColor: "#1e3a8a", padding: "24px", color: "#ffffff", fontFamily: "sans-serif" }}>
         <div style={{ textAlign: "center", marginBottom: "32px" }}><span style={{ fontSize: "48px" }}>🎾</span><h1 style={{ fontSize: "26px", fontWeight: "900", margin: "4px 0" }}>Bolão da Família Moreno</h1><p style={{ color: "#93c5fd", fontSize: "12px", fontWeight: "bold", margin: 0 }}>by Lãncio</p><p style={{ fontSize: "11px", color: "#bfdbfe", marginTop: "8px" }}>Apostas até: 13/08 às 11:30</p></div>
-        <form onSubmit={logar} style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "16px", width: "100%", maxWidth: "340px", marginBottom: "20px" }}>
-          <input type="text" placeholder="Nome" value={inputN} onChange={e => setInputN(e.target.value)} style={{ display: "block", width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid #cbd5e1", marginBottom: "12px", boxSizing: "border-box" }} />
-          <input type="password" placeholder="PIN" maxLength={4} value={inputP} onChange={e => setInputP(e.target.value)} style={{ display: "block", width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid #cbd5e1", marginBottom: "16px", textAlign: "center", boxSizing: "border-box" }} />
-          <button type="submit" style={{ display: "block", width: "100%", backgroundColor: "#1d4ed8", color: "#ffffff", padding: "14px", borderRadius: "12px", border: "none", fontWeight: "900", cursor: "pointer" }}>Entrar 🔐</button>
-        </form>
+        <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "16px", width: "100%", maxWidth: "340px", marginBottom: "20px", boxSizing: "border-box" }}>
+          <form onSubmit={logar}>
+            <input type="text" placeholder="Nome" value={inputN} onChange={e => setInputN(e.target.value)} style={{ display: "block", width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid #cbd5e1", marginBottom: "12px", boxSizing: "border-box", color: "#000" }} />
+            <input type="password" placeholder="PIN" maxLength={4} value={inputP} onChange={e => setInputP(e.target.value)} style={{ display: "block", width: "100%", padding: "14px", borderRadius: "12px", border: "1px solid #cbd5e1", marginBottom: "16px", textAlign: "center", boxSizing: "border-box", color: "#000" }} />
+            <button type="submit" style={{ display: "block", width: "100%", backgroundColor: "#1d4ed8", color: "#ffffff", padding: "14px", borderRadius: "12px", border: "none", fontWeight: "900", cursor: "pointer", marginBottom: "10px" }}>Entrar 🔐</button>
+          </form>
+          <button onClick={cadastrarAparelho} style={{ display: "block", width: "100%", backgroundColor: "#10b981", color: "#ffffff", padding: "14px", borderRadius: "12px", border: "none", fontWeight: "900", cursor: "pointer" }}>Criar Nova Conta ✨</button>
+        </div>
         <button onClick={() => { const p = prompt("Senha:"); if (p === "vovo123") setTela("admin"); else alert("Erro!"); }} style={{ background: "none", border: "none", color: "#93c5fd", fontSize: "11px", textDecoration: "underline", cursor: "pointer" }}>Área do Juiz ⚙️</button>
       </div>
     );
@@ -114,7 +155,17 @@ export default function App() {
           <main>{Array.from({ length: info.total }).map((_, i) => renderCard(i, false))}</main>
           <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
             {rCurr > 1 && <button onClick={() => setRCurr(rCurr - 1)} style={{ flex: 1, backgroundColor: "#e2e8f0", color: "#334155", border: "none", padding: "14px", borderRadius: "12px", fontWeight: "bold", cursor: "pointer" }}>← Voltar</button>}
-            <button onClick={() => { if (rCurr < 7) { setRCurr(rCurr + 1); window.scrollTo(0, 0); } else { localStorage.setItem(`b_96_${user}`, JSON.stringify(votos)); alert("Salvo! 🎾"); setTela("ranking"); } }} style={{ flex: 2, backgroundColor: "#1d4ed8", color: "#ffffff", border: "none", padding: "14px", borderRadius: "12px", fontWeight: "bold", cursor: "pointer" }}>{rCurr === 7 ? "Confirmar Bolão! 🚀" : "Avançar →"}</button>
+            <button onClick={() => { 
+              if (rCurr < 7) { 
+                setRCurr(rCurr + 1); window.scrollTo(0, 0); 
+              } else { 
+                localStorage.setItem(`b_96_${user}`, JSON.stringify(votos)); 
+                const codzap = `BOLAO:${user}||${JSON.stringify(votos)}`;
+                navigator.clipboard.writeText(codzap);
+                alert("Salvo! 🎾 O seu código do WhatsApp foi COPIADO automaticamente! Envie para o Juiz Lucio.");
+                setTela("ranking"); 
+              } 
+            }} style={{ flex: 2, backgroundColor: "#1d4ed8", color: "#ffffff", border: "none", padding: "14px", borderRadius: "12px", fontWeight: "bold", cursor: "pointer" }}>{rCurr === 7 ? "Salvar e Copiar p/ WhatsApp! 🚀" : "Avançar →"}</button>
           </div>
         </div>
       </div>
@@ -126,6 +177,13 @@ export default function App() {
       <div style={{ minHeight: "100vh", width: "100%", backgroundColor: "#fff1f2", padding: "16px", color: "#9f1239", fontFamily: "sans-serif", display: "flex", flexDirection: "column", alignItems: "center", boxSizing: "border-box" }}>
         <div style={{ width: "100%", maxWidth: "360px" }}>
           <header style={{ display: "flex", borderBottom: "1px solid #fecdd3", paddingBottom: "12px", marginBottom: "16px", justifyContent: "space-between", alignItems: "center" }}><div><h1 style={{ fontSize: "15px", fontWeight: "950", color: "#e11d48", margin: 0 }}>Área do Juiz ({info.nome})</h1><p style={{ fontSize: "10px", color: "#9f1239", margin: 0 }}>Marque em vermelho quem venceu</p></div><button onClick={() => { setRCurr(1); setTela("login"); }} style={{ padding: "6px 12px", backgroundColor: "#ffffff", border: "1px solid #fecdd3", borderRadius: "8px", fontSize: "11px", fontWeight: "bold", color: "#e11d48", cursor: "pointer" }}>Sair Juiz</button></header>
+          
+          <div style={{ backgroundColor: "#ffffff", padding: "12px", borderRadius: "12px", border: "1px solid #fecdd3", marginBottom: "16px" }}>
+            <p style={{ fontSize: "11px", fontWeight: "bold", margin: "0 0 6px 0", color: "#e11d48" }}>📥 IMPORTAR PALPITE DE PARENTE:</p>
+            <input type="text" placeholder="Cole o código do WhatsApp aqui..." value={textoImportar} onChange={e => setTextoImportar(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", boxSizing: "border-box", fontSize: "11px", marginBottom: "6px", color: "#000" }} />
+            <button onClick={processarImportacao} style={{ width: "100%", backgroundColor: "#e11d48", color: "#ffffff", border: "none", padding: "10px", borderRadius: "8px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}>Adicionar Participante no Ranking 📥</button>
+          </div>
+
           <main>{Array.from({ length: info.total }).map((_, i) => renderCard(i, true))}</main>
           <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
             {rCurr > 1 && <button onClick={() => setRCurr(rCurr - 1)} style={{ flex: 1, backgroundColor: "#ffffff", border: "1px solid #fecdd3", padding: "14px", borderRadius: "12px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", color: "#e11d48" }}>← Voltar</button>}
